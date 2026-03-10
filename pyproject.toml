@@ -1,0 +1,19 @@
+[project]
+name = "brane"
+version = "0.1.0"
+description = "brane - Local VLM-based OCR using Qwen2.5-VL via Ollama"
+requires-python = ">=3.12"
+dependencies = [
+    "ollama",
+    "click",
+]
+
+[project.scripts]
+brane = "ocr_engine:main"
+
+[tool.setuptools]
+py-modules = ["ocr_engine", "prompts"]
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"

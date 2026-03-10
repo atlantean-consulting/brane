@@ -154,11 +154,23 @@ brane music score.pdf
 
 A multi-page PDF produces one MusicXML file per page (e.g., `score_page001.musicxml`, `score_page002.musicxml`).
 
+### Output Formats
+
+brane supports two MusicXML output formats:
+
+- **`.musicxml`** -- plain XML text file
+- **`.mxl`** -- compressed MusicXML (ZIP archive), the preferred format for MuseScore and other editors
+
+These are *not* interchangeable: `.mxl` is a ZIP container, not just a renamed `.musicxml`. MuseScore will reject a plain XML file with an `.mxl` extension.
+
 ### Output Options
 
 ```bash
 # Explicit output file (single input only)
 brane music sheet.png -o output.musicxml
+
+# Compressed MusicXML
+brane music sheet.png -o output.mxl
 
 # Output to a directory (works with multiple inputs)
 brane music *.pdf -o results/
@@ -167,9 +179,35 @@ brane music *.pdf -o results/
 brane music score.pdf --dpi 600
 ```
 
+### Concatenating Multi-Page Scores
+
+To merge multiple pages into a single score:
+
+```bash
+brane music pg1.pdf pg2.pdf -c -o full_score.mxl
+```
+
+The `-c`/`--concat` flag processes each page separately, then combines all measures into one file with continuous measure numbering. This requires `-o` to specify the output file.
+
+### Pre-processing Scanned Scores
+
+The `--clean` flag applies image pre-processing (adaptive binarization, noise removal, border cleanup) before OMR. This can help with:
+
+- Scanned books with yellowed pages or shadows
+- Low-contrast photocopies
+- Images with dark binding edges
+
+```bash
+brane music old_scan.pdf --clean -o result.mxl
+```
+
+Note: `--clean` is aggressive and may degrade results on some material. See [KNOWN_ISSUES.md](KNOWN_ISSUES.md) for details. Try without it first, then with it, and compare.
+
 ### GPU Acceleration
 
-Sheet music recognition uses ONNX Runtime and will automatically use your NVIDIA GPU if a working CUDA 12 toolkit is installed. If CUDA isn't available, it falls back to CPU with a message. To explicitly disable GPU:
+Sheet music recognition uses ONNX Runtime and will automatically detect and use your NVIDIA GPU if a working CUDA 12 toolkit is installed. brane auto-discovers CUDA libraries from standard system paths and Ollama's bundled libraries, so manual `LD_LIBRARY_PATH` setup is usually not needed.
+
+If CUDA isn't fully available, it falls back to CPU with a message. To explicitly disable GPU:
 
 ```bash
 brane music sheet.png --no-gpu
@@ -179,11 +217,11 @@ brane music sheet.png --no-gpu
 
 The homr engine focuses on pitch and rhythm on bass and treble clefs. It handles:
 
-- Printed sheet music (not handwritten)
+- **Clean, modern printed sheet music** (computer-engraved scores)
 - Polyphonic scores (multiple voices)
 - Standard notation (notes, rests, accidentals, key/time signatures)
 
-It currently has limited support for dynamics, articulation, and double sharps/flats.
+It currently has limited support for dynamics, articulation, and double sharps/flats. See [KNOWN_ISSUES.md](KNOWN_ISSUES.md) for material that causes problems.
 
 ### First Run
 
@@ -191,9 +229,11 @@ The first invocation downloads ~130MB of ONNX models. This only happens once.
 
 ## Supported Formats
 
-**Text OCR**: PNG, JPEG, WebP, BMP, TIFF, GIF.
+**Text OCR input**: PNG, JPEG, WebP, BMP, TIFF, GIF.
 
-**Sheet Music**: PNG, JPEG, PDF.
+**Sheet Music input**: PNG, JPEG, PDF.
+
+**Sheet Music output**: `.musicxml` (plain XML), `.mxl` (compressed MusicXML).
 
 ## Architecture
 
@@ -278,7 +318,9 @@ brane page1.png page2.png page3.png -o document.md
 
 ### Sheet music: "CUDA not fully available, falling back to CPU"
 
-This means onnxruntime can't load the CUDA 12 provider. Sheet music OCR still works on CPU, but GPU is faster. To enable GPU acceleration, install the CUDA 12.8 toolkit:
+This means onnxruntime can't load its CUDA provider. brane auto-discovers CUDA libraries from `/usr/local/cuda*/lib64/` and Ollama's bundled libraries, but the full CUDA 12 toolkit and cuDNN 9 are required. Sheet music OCR still works on CPU, but GPU is significantly faster.
+
+To enable GPU acceleration, install the CUDA 12.8 toolkit:
 
 ```bash
 wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
@@ -287,9 +329,20 @@ sudo apt update
 sudo apt install cuda-toolkit-12-8
 ```
 
-Then add to your `~/.bashrc`:
+If adding NVIDIA's CUDA repo causes package conflicts with your existing driver packages, pin the repo to only provide toolkit packages:
 
 ```bash
-export PATH=/usr/local/cuda-12.8/bin:$PATH
-export LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64:$LD_LIBRARY_PATH
+sudo tee /etc/apt/preferences.d/cuda-repo-pin-600 << 'EOF'
+Package: cuda* libcublas* libcudnn* libcufft* libcurand* libcusolver* libcusparse* libnvjitlink* libnpp* nvidia-cuda* nsight*
+Pin: origin developer.download.nvidia.com
+Pin-Priority: 600
+
+Package: *nvidia* libnvidia*
+Pin: origin developer.download.nvidia.com
+Pin-Priority: -1
+
+Package: *
+Pin: origin developer.download.nvidia.com
+Pin-Priority: 100
+EOF
 ```

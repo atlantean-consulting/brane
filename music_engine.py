@@ -58,6 +58,38 @@ def _cuda_actually_works() -> bool:
         pass
     return _gpu_checked
 
+def write_musicxml(tree_or_path, output_path: Path) -> None:
+    """Write a MusicXML file as .musicxml (plain XML) or .mxl (compressed)."""
+    import xml.etree.ElementTree as ET
+    import zipfile
+
+    if isinstance(tree_or_path, (str, Path)):
+        tree = ET.parse(tree_or_path)
+    else:
+        tree = tree_or_path
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if output_path.suffix.lower() == ".mxl":
+        # .mxl is a ZIP archive containing the MusicXML + container manifest
+        xml_bytes = ET.tostring(tree.getroot(), encoding="UTF-8", xml_declaration=True)
+        container = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<container>\n'
+            '  <rootfiles>\n'
+            '    <rootfile full-path="score.musicxml"/>\n'
+            '  </rootfiles>\n'
+            '</container>\n'
+        )
+        with zipfile.ZipFile(str(output_path), "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("META-INF/container.xml", container)
+            zf.writestr("score.musicxml", xml_bytes)
+    else:
+        ET.indent(tree)
+        tree.write(str(output_path), encoding="UTF-8", xml_declaration=True)
+
+
+SUPPORTED_OUTPUT_FORMATS = {".musicxml", ".mxl"}
 SUPPORTED_IMAGE_FORMATS = {".png", ".jpg", ".jpeg"}
 SUPPORTED_PDF_FORMATS = {".pdf"}
 SUPPORTED_FORMATS = SUPPORTED_IMAGE_FORMATS | SUPPORTED_PDF_FORMATS
@@ -79,7 +111,49 @@ def pdf_to_images(pdf_path: Path, dpi: int = 300) -> list[Path]:
     return images
 
 
-def run_omr(image_path: Path, output_path: Path, use_gpu: bool = True) -> Path:
+def clean_image(image_path: Path) -> Path:
+    """Binarize and clean a scanned sheet music image for better OMR."""
+    import cv2
+    import numpy as np
+
+    img = cv2.imread(str(image_path))
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    h, w = gray.shape
+
+    # Adaptive threshold to remove uneven background (yellowed pages, shadows)
+    binary = cv2.adaptiveThreshold(
+        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 51, 15
+    )
+
+    # Small morphological opening to remove noise specks
+    kernel = np.ones((2, 2), np.uint8)
+    cleaned = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
+
+    # Remove dark scan borders (binding shadow, scanner edge)
+    for col in range(w // 5):
+        if np.mean(cleaned[:, col]) > 230:
+            break
+        cleaned[:, col] = 255
+    for col in range(w - 1, w - w // 5, -1):
+        if np.mean(cleaned[:, col]) > 230:
+            break
+        cleaned[:, col] = 255
+    for row in range(h // 10):
+        if np.mean(cleaned[row, :]) > 230:
+            break
+        cleaned[row, :] = 255
+    for row in range(h - 1, h - h // 10, -1):
+        if np.mean(cleaned[row, :]) > 230:
+            break
+        cleaned[row, :] = 255
+
+    out_path = image_path.with_stem(image_path.stem + "_clean")
+    cv2.imwrite(str(out_path), cleaned)
+    return out_path
+
+
+def run_omr(image_path: Path, output_path: Path, use_gpu: bool = True,
+            clean: bool = False) -> Path:
     """Run homr OMR on a single image, writing MusicXML to output_path."""
     from homr.main import ProcessingConfig, download_weights, process_image
     from homr.music_xml_generator import XmlGeneratorArguments
@@ -106,18 +180,59 @@ def run_omr(image_path: Path, output_path: Path, use_gpu: bool = True) -> Path:
         work_image = work_dir / image_path.name
         shutil.copy2(image_path, work_image)
 
+        if clean:
+            work_image = clean_image(work_image)
+
         process_image(str(work_image), config, xml_args)
 
         generated = work_image.with_suffix(".musicxml")
         if not generated.exists():
             raise RuntimeError(f"homr did not produce output for {image_path.name}")
 
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(generated), str(output_path))
+        if output_path.suffix.lower() == ".mxl":
+            write_musicxml(generated, output_path)
+        else:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(generated), str(output_path))
     finally:
         shutil.rmtree(work_dir, ignore_errors=True)
 
     return output_path
+
+
+def concat_musicxml(files: list[Path], output_path: Path) -> None:
+    """Concatenate multiple MusicXML files into one by appending measures."""
+    import xml.etree.ElementTree as ET
+
+    if not files:
+        return
+
+    base_tree = ET.parse(files[0])
+    base_root = base_tree.getroot()
+
+    # Find all <part> elements in the base file and index by id
+    base_parts = {p.get("id"): p for p in base_root.findall(".//part")}
+
+    for extra_file in files[1:]:
+        extra_tree = ET.parse(extra_file)
+        extra_root = extra_tree.getroot()
+
+        for extra_part in extra_root.findall(".//part"):
+            part_id = extra_part.get("id")
+            if part_id not in base_parts:
+                continue
+            base_part = base_parts[part_id]
+
+            # Renumber measures to continue from the base
+            existing = base_part.findall("measure")
+            next_num = max((int(m.get("number", 0)) for m in existing), default=0) + 1
+
+            for measure in extra_part.findall("measure"):
+                measure.set("number", str(next_num))
+                next_num += 1
+                base_part.append(measure)
+
+    write_musicxml(base_tree, output_path)
 
 
 @click.command("music")
@@ -126,7 +241,11 @@ def run_omr(image_path: Path, output_path: Path, use_gpu: bool = True) -> Path:
               help="Output file or directory. Defaults to input name with .musicxml extension.")
 @click.option("--dpi", default=300, help="DPI for PDF rasterization (default: 300).")
 @click.option("--no-gpu", is_flag=True, help="Disable GPU acceleration.")
-def music(inputs, output, dpi, no_gpu):
+@click.option("-c", "--concat", is_flag=True,
+              help="Concatenate all pages into a single MusicXML file.")
+@click.option("--clean", is_flag=True,
+              help="Pre-process images (binarize, remove borders) for scanned/old scores.")
+def music(inputs, output, dpi, no_gpu, concat, clean):
     """Recognize sheet music and output MusicXML.
 
     Accepts images (PNG, JPG) and PDF files.
@@ -138,7 +257,15 @@ def music(inputs, output, dpi, no_gpu):
         brane music score.pdf -o score.musicxml
 
         brane music page1.png page2.png -o output_dir/
+
+        brane music pg1.pdf pg2.pdf -c -o full_score.musicxml
+
+        brane music old_scan.pdf --clean -o result.musicxml
     """
+    if concat and not output:
+        click.echo("Error: --concat requires -o to specify the output file.", err=True)
+        sys.exit(1)
+
     validated = []
     for inp in inputs:
         if inp.suffix.lower() not in SUPPORTED_FORMATS:
@@ -163,12 +290,16 @@ def music(inputs, output, dpi, no_gpu):
         else:
             all_images.append((inp, inp.stem))
 
-    # Determine output paths
-    if output and output.suffix == ".musicxml":
+    # When concatenating, process into a temp dir then merge
+    if concat:
+        concat_dir = Path(tempfile.mkdtemp(prefix="brane_concat_"))
+        cleanup_dirs.add(concat_dir)
+        output_paths = [concat_dir / f"{stem}.musicxml" for _, stem in all_images]
+    elif output and output.suffix.lower() in SUPPORTED_OUTPUT_FORMATS:
         if len(all_images) > 1:
             click.echo(
                 "Error: Cannot use a single output file with multiple inputs. "
-                "Use a directory instead.",
+                "Use -c/--concat to merge, or specify a directory.",
                 err=True,
             )
             sys.exit(1)
@@ -181,16 +312,24 @@ def music(inputs, output, dpi, no_gpu):
         output_paths = [base_dir / f"{stem}.musicxml" for _, stem in all_images]
 
     # Process each image
+    completed = []
     try:
         for (img_path, _stem), out_path in zip(all_images, output_paths):
             click.echo(f"Processing: {img_path.name}", err=True)
             try:
-                run_omr(img_path, out_path, use_gpu=not no_gpu)
-                click.echo(f"Written: {out_path}", err=True)
+                run_omr(img_path, out_path, use_gpu=not no_gpu, clean=clean)
+                completed.append(out_path)
+                if not concat:
+                    click.echo(f"Written: {out_path}", err=True)
             except Exception as e:
                 click.echo(f"Error processing {img_path.name}: {e}", err=True)
                 if len(all_images) == 1:
                     sys.exit(1)
+
+        if concat and completed:
+            click.echo(f"Concatenating {len(completed)} page(s)...", err=True)
+            concat_musicxml(completed, output)
+            click.echo(f"Written: {output}", err=True)
     finally:
         for d in cleanup_dirs:
             shutil.rmtree(d, ignore_errors=True)

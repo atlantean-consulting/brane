@@ -25,9 +25,15 @@ brane *.png -o combined.md
 # Custom extraction prompt
 brane table.png --prompt "Extract this table as CSV"
 
-# Sheet music OCR (outputs MusicXML)
+# Sheet music OCR (outputs MusicXML or compressed .mxl)
 brane music sheet.png
-brane music score.pdf -o score.musicxml
+brane music score.pdf -o score.mxl
+
+# Concatenate multi-page scores
+brane music pg1.pdf pg2.pdf -c -o full_score.mxl
+
+# Pre-process old/scanned scores
+brane music old_scan.pdf --clean -o result.musicxml
 ```
 
 ## Requirements
@@ -57,13 +63,15 @@ brane [OPTIONS] IMAGES...
 ```
 brane music [OPTIONS] INPUTS...
 
-  -o, --output PATH    Output file or directory (default: <input>.musicxml)
+  -o, --output PATH    Output file or directory (.musicxml or .mxl)
+  -c, --concat         Concatenate all pages into a single file
+  --clean              Pre-process images for scanned/old scores
   --dpi INTEGER        DPI for PDF rasterization (default: 300)
   --no-gpu             Disable GPU acceleration
   --help               Show help
 ```
 
-See [MANUAL.md](MANUAL.md) for detailed documentation.
+See [MANUAL.md](MANUAL.md) for detailed documentation and [KNOWN_ISSUES.md](KNOWN_ISSUES.md) for limitations.
 
 ## Why "brane"?
 

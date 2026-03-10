@@ -1,18 +1,20 @@
 [project]
 name = "brane"
 version = "0.1.0"
-description = "brane - Local VLM-based OCR using Qwen2.5-VL via Ollama"
+description = "brane - Local OCR for text and sheet music"
 requires-python = ">=3.12"
 dependencies = [
     "ollama",
     "click",
+    "homr",
+    "PyMuPDF",
 ]
 
 [project.scripts]
-brane = "ocr_engine:main"
+brane = "cli:main"
 
 [tool.setuptools]
-py-modules = ["ocr_engine", "prompts"]
+py-modules = ["cli", "ocr_engine", "music_engine", "prompts"]
 
 [build-system]
 requires = ["setuptools>=75"]

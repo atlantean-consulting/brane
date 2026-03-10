@@ -50,7 +50,7 @@ def ocr_image(image_path: Path, model: str, prompt: str, stream: bool = True, ke
         yield response["message"]["content"]
 
 
-@click.command()
+@click.command("ocr")
 @click.argument("images", nargs=-1, required=True, type=click.Path(exists=True, path_type=Path))
 @click.option("-o", "--output", type=click.Path(path_type=Path), help="Write output to file.")
 @click.option(
@@ -64,8 +64,8 @@ def ocr_image(image_path: Path, model: str, prompt: str, stream: bool = True, ke
 @click.option("-p", "--prompt", "custom_prompt", default=None, help="Custom prompt override.")
 @click.option("--no-stream", is_flag=True, help="Disable streaming output.")
 @click.option("--persist", is_flag=True, help="Keep model loaded in VRAM after completion.")
-def main(images, output, fmt, model_size, custom_prompt, no_stream, persist):
-    """brane - Extract text from images using local VLM OCR.
+def ocr(images, output, fmt, model_size, custom_prompt, no_stream, persist):
+    """Extract text from images using local VLM OCR.
 
     Examples:
 
@@ -126,4 +126,4 @@ def main(images, output, fmt, model_size, custom_prompt, no_stream, persist):
 
 
 if __name__ == "__main__":
-    main()
+    ocr()

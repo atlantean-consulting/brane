@@ -2,9 +2,9 @@
 
 ## Overview
 
-brane is a command-line OCR tool that runs entirely on your local machine. It uses the Qwen3-VL vision-language model through Ollama to extract text from images with quality that rivals cloud APIs like Claude and GPT-4V.
+brane is a command-line OCR tool that runs entirely on your local machine. It uses the Qwen3-VL vision-language model through Ollama to extract text from images with quality that rivals cloud APIs like Claude and GPT-4V, and the homr neural network engine to recognize sheet music and output MusicXML.
 
-Unlike traditional OCR engines (Tesseract, EasyOCR), brane understands document structure -- headings, lists, tables, code blocks -- and preserves them in the output.
+Unlike traditional OCR engines (Tesseract, EasyOCR), brane understands document structure -- headings, lists, tables, code blocks -- and preserves them in the output. For sheet music, it replaces tools like Audiveris with a transformer-based approach that handles printed scores with less manual cleanup.
 
 ## Installation
 
@@ -132,23 +132,82 @@ brane image.png --no-stream
 
 Streaming is automatically disabled when writing to a file (`-o`).
 
-## Supported Image Formats
+## Sheet Music OCR
 
-PNG, JPEG, WebP, BMP, TIFF, GIF.
+brane can recognize printed sheet music and output MusicXML files, which can be opened in MuseScore, Finale, Sibelius, or any MusicXML-compatible editor.
+
+### Basic Usage
+
+```bash
+brane music sheet.png
+```
+
+This produces `sheet.musicxml` in the same directory.
+
+### PDF Input
+
+Sheet music PDFs are automatically converted to images for processing:
+
+```bash
+brane music score.pdf
+```
+
+A multi-page PDF produces one MusicXML file per page (e.g., `score_page001.musicxml`, `score_page002.musicxml`).
+
+### Output Options
+
+```bash
+# Explicit output file (single input only)
+brane music sheet.png -o output.musicxml
+
+# Output to a directory (works with multiple inputs)
+brane music *.pdf -o results/
+
+# Higher DPI for PDF rasterization (default: 300)
+brane music score.pdf --dpi 600
+```
+
+### GPU Acceleration
+
+Sheet music recognition uses ONNX Runtime and will automatically use your NVIDIA GPU if a working CUDA 12 toolkit is installed. If CUDA isn't available, it falls back to CPU with a message. To explicitly disable GPU:
+
+```bash
+brane music sheet.png --no-gpu
+```
+
+### What It Handles
+
+The homr engine focuses on pitch and rhythm on bass and treble clefs. It handles:
+
+- Printed sheet music (not handwritten)
+- Polyphonic scores (multiple voices)
+- Standard notation (notes, rests, accidentals, key/time signatures)
+
+It currently has limited support for dynamics, articulation, and double sharps/flats.
+
+### First Run
+
+The first invocation downloads ~130MB of ONNX models. This only happens once.
+
+## Supported Formats
+
+**Text OCR**: PNG, JPEG, WebP, BMP, TIFF, GIF.
+
+**Sheet Music**: PNG, JPEG, PDF.
 
 ## Architecture
 
 brane is intentionally minimal:
 
 ```
-ocr_engine.py   # CLI and Ollama interaction (~130 lines)
-prompts.py      # OCR prompt templates
-pyproject.toml  # Package metadata
+cli.py            # CLI routing (subcommands with backwards-compatible default)
+ocr_engine.py     # Text OCR via Ollama/Qwen3-VL
+music_engine.py   # Sheet music OMR via homr
+prompts.py        # OCR prompt templates
+pyproject.toml    # Package metadata
 ```
 
-It's a thin wrapper around the Ollama Python client. The intelligence comes from Qwen3-VL, not from brane's code.
-
-### How It Works
+### How Text OCR Works
 
 1. You pass an image to `brane`
 2. brane sends the image to Ollama's local API (localhost:11434) along with a carefully crafted OCR prompt
@@ -156,9 +215,17 @@ It's a thin wrapper around the Ollama Python client. The intelligence comes from
 4. brane streams the result to stdout or writes it to a file
 5. The model unloads from VRAM (unless `--persist` is set)
 
+### How Sheet Music OCR Works
+
+1. You pass an image or PDF to `brane music`
+2. PDFs are converted to PNG images via PyMuPDF
+3. homr detects staves, noteheads, clefs, and other symbols using a segmentation neural network
+4. A transformer model (Polyphonic-TrOMR) recognizes the note sequences
+5. The result is written as a MusicXML file
+
 ### Prompt Tuning
 
-The OCR prompts live in `prompts.py`. If you want to adjust brane's default behavior, edit the prompts there. The key principles:
+The text OCR prompts live in `prompts.py`. If you want to adjust brane's default behavior, edit the prompts there. The key principles:
 
 - Tell the model it's "a precise OCR engine" (prevents it from describing the image)
 - Say "output ONLY the extracted text" (prevents chatty preambles)
@@ -207,4 +274,22 @@ Very dense, multi-page images may hit the model's context limit. Split large doc
 
 ```bash
 brane page1.png page2.png page3.png -o document.md
+```
+
+### Sheet music: "CUDA not fully available, falling back to CPU"
+
+This means onnxruntime can't load the CUDA 12 provider. Sheet music OCR still works on CPU, but GPU is faster. To enable GPU acceleration, install the CUDA 12.8 toolkit:
+
+```bash
+wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
+sudo dpkg -i cuda-keyring_1.1-1_all.deb
+sudo apt update
+sudo apt install cuda-toolkit-12-8
+```
+
+Then add to your `~/.bashrc`:
+
+```bash
+export PATH=/usr/local/cuda-12.8/bin:$PATH
+export LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64:$LD_LIBRARY_PATH
 ```

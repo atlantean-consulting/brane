@@ -2,7 +2,7 @@
 
 Local OCR that doesn't suck.
 
-`brane` uses [Qwen3-VL](https://github.com/QwenLM/Qwen3-VL) running locally via [Ollama](https://ollama.com) to extract text from images with near-cloud-API quality. No data leaves your machine!
+`brane` uses [Qwen3-VL](https://github.com/QwenLM/Qwen3-VL) running locally via [Ollama](https://ollama.com) to extract text from images, and [homr](https://github.com/liebharc/homr) to recognize sheet music. No data leaves your machine!
 
 ## Quick Start
 
@@ -24,6 +24,10 @@ brane *.png -o combined.md
 
 # Custom extraction prompt
 brane table.png --prompt "Extract this table as CSV"
+
+# Sheet music OCR (outputs MusicXML)
+brane music sheet.png
+brane music score.pdf -o score.musicxml
 ```
 
 ## Requirements
@@ -34,7 +38,7 @@ brane table.png --prompt "Extract this table as CSV"
 - Python 3.12+
 - ~6GB disk space for 8B model, ~19GB for 30B
 
-## Options
+## Text OCR Options
 
 ```
 brane [OPTIONS] IMAGES...
@@ -46,6 +50,17 @@ brane [OPTIONS] IMAGES...
   --persist                  Keep model in VRAM after completion
   --no-stream                Disable streaming output
   --help                     Show help
+```
+
+## Sheet Music Options
+
+```
+brane music [OPTIONS] INPUTS...
+
+  -o, --output PATH    Output file or directory (default: <input>.musicxml)
+  --dpi INTEGER        DPI for PDF rasterization (default: 300)
+  --no-gpu             Disable GPU acceleration
+  --help               Show help
 ```
 
 See [MANUAL.md](MANUAL.md) for detailed documentation.

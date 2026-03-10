@@ -10,6 +10,22 @@ import click
 
 _gpu_checked = None
 
+# Known locations for CUDA 12 and cuDNN 9 libraries.
+_CUDA_SEARCH_PATHS = [
+    "/usr/local/cuda/lib64",
+    "/usr/local/cuda-12.8/lib64",
+    "/usr/local/lib/ollama/cuda_v12",       # Ollama's bundled CUDA 12
+    "/usr/local/lib/ollama/mlx_cuda_v13",   # Ollama's cuDNN 9
+]
+
+
+def _ensure_cuda_libs_loadable() -> None:
+    """Add CUDA/cuDNN library dirs to LD_LIBRARY_PATH if not already present."""
+    ld_path = os.environ.get("LD_LIBRARY_PATH", "")
+    dirs_to_add = [d for d in _CUDA_SEARCH_PATHS if os.path.isdir(d) and d not in ld_path]
+    if dirs_to_add:
+        os.environ["LD_LIBRARY_PATH"] = ":".join(dirs_to_add + ([ld_path] if ld_path else []))
+
 
 def _cuda_actually_works() -> bool:
     """Test whether onnxruntime can actually create a CUDA session."""
@@ -18,12 +34,21 @@ def _cuda_actually_works() -> bool:
         return _gpu_checked
     _gpu_checked = False
     try:
+        _ensure_cuda_libs_loadable()
+        import ctypes
+        # Pre-load CUDA/cuDNN libs so onnxruntime's provider bridge can find them.
+        for lib_name in ("libcudart.so.12", "libcublas.so.12", "libcublasLt.so.12",
+                         "libcurand.so.10", "libcufft.so.11", "libcudnn.so.9"):
+            for d in _CUDA_SEARCH_PATHS:
+                lib_path = os.path.join(d, lib_name)
+                if os.path.exists(lib_path):
+                    ctypes.CDLL(lib_path, mode=ctypes.RTLD_GLOBAL)
+                    break
         import onnxruntime as ort
         if "CUDAExecutionProvider" not in ort.get_available_providers():
             return False
         # Load the CUDA provider bridge — this is what actually fails
         # when CUDA toolkit libs (curand, cublas, cudnn, etc.) are missing.
-        import ctypes
         lib_dir = os.path.dirname(ort.__file__)
         cuda_lib = os.path.join(lib_dir, "capi", "libonnxruntime_providers_cuda.so")
         if os.path.exists(cuda_lib):

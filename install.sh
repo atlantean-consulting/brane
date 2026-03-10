@@ -14,7 +14,7 @@ for arg in "$@"; do
             echo "Install brane and its dependencies."
             echo ""
             echo "Options:"
-            echo "  --big    Also pull the 72B model (~48GB download, needs 48GB+ VRAM)"
+            echo "  --big    Also pull the 30B model (~19GB download, needs 24GB+ VRAM)"
             echo "  -h       Show this help"
             exit 0
             ;;
@@ -58,7 +58,7 @@ fi
 
 GPU_MEM=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | head -1)
 if [ "$GPU_MEM" -lt 8000 ]; then
-    err "GPU has ${GPU_MEM}MB VRAM. The 7B model needs at least 8GB."
+    err "GPU has ${GPU_MEM}MB VRAM. The 8B model needs at least 8GB."
     exit 1
 fi
 
@@ -87,12 +87,12 @@ fi
 
 # --- Pull models ---
 
-info "Pulling Qwen2.5-VL 7B model (~5GB)..."
-ollama pull qwen2.5vl:7b
+info "Pulling Qwen3-VL 8B model (~6GB)..."
+ollama pull qwen3-vl:8b
 
 if [ "$BIG" = true ]; then
-    info "Pulling Qwen2.5-VL 72B model (~48GB)..."
-    ollama pull qwen2.5vl:72b
+    info "Pulling Qwen3-VL 30B model (~19GB)..."
+    ollama pull qwen3-vl:30b
 fi
 
 # --- Set up Python environment ---

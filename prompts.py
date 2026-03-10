@@ -1,4 +1,4 @@
-"""OCR prompt templates for Qwen2.5-VL."""
+"""OCR prompt templates for Qwen3-VL."""
 
 MARKDOWN_PROMPT = """\
 You are a precise OCR engine. Extract ALL text from this image exactly as it appears.

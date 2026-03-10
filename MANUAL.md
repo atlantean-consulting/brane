@@ -2,7 +2,7 @@
 
 ## Overview
 
-brane is a command-line OCR tool that runs entirely on your local machine. It uses the Qwen2.5-VL vision-language model through Ollama to extract text from images with quality that rivals cloud APIs like Claude and GPT-4V.
+brane is a command-line OCR tool that runs entirely on your local machine. It uses the Qwen3-VL vision-language model through Ollama to extract text from images with quality that rivals cloud APIs like Claude and GPT-4V.
 
 Unlike traditional OCR engines (Tesseract, EasyOCR), brane understands document structure -- headings, lists, tables, code blocks -- and preserves them in the output.
 
@@ -16,11 +16,11 @@ Run the installer:
 
 This will:
 1. Install Ollama (if not present)
-2. Pull the Qwen2.5-VL 7B model (~5GB download)
+2. Pull the Qwen3-VL 8B model (~6GB download)
 3. Create a Python virtual environment
 4. Install brane and its dependencies
 
-To also install the 72B model (~48GB, requires 48GB+ VRAM):
+To also install the 30B model (~19GB, requires 24GB+ VRAM):
 
 ```bash
 ./install.sh --big
@@ -79,15 +79,15 @@ brane ships with two model sizes:
 
 | Model | VRAM | Speed | Quality |
 |-------|------|-------|---------|
-| 7b (default) | ~5GB | Fast (~3-8s) | Excellent for most documents |
-| 72b | ~48GB | Slower (~15-30s) | Maximum quality, complex layouts |
+| 8b (default) | ~8GB | Fast (~3-8s) | Excellent for most documents |
+| 30b | ~22GB | Slower (~10-20s) | Maximum quality, complex layouts |
 
 ```bash
-brane document.png -m 7b    # default
-brane document.png -m 72b   # higher quality
+brane document.png -m 8b    # default
+brane document.png -m 30b   # higher quality
 ```
 
-The 72B model requires approximately 48GB of VRAM. If you have multiple GPUs, Ollama will automatically shard the model across them.
+The 30B model requires approximately 22-24GB of VRAM. If you have multiple GPUs, Ollama will automatically split the model across them.
 
 ### Custom Prompts
 
@@ -119,7 +119,7 @@ brane page3.png             # last one, let it unload
 To manually unload a model at any time:
 
 ```bash
-ollama stop qwen2.5vl:7b
+ollama stop qwen3-vl:8b
 ```
 
 ### Streaming
@@ -146,13 +146,13 @@ prompts.py      # OCR prompt templates
 pyproject.toml  # Package metadata
 ```
 
-It's a thin wrapper around the Ollama Python client. The intelligence comes from Qwen2.5-VL, not from brane's code.
+It's a thin wrapper around the Ollama Python client. The intelligence comes from Qwen3-VL, not from brane's code.
 
 ### How It Works
 
 1. You pass an image to `brane`
 2. brane sends the image to Ollama's local API (localhost:11434) along with a carefully crafted OCR prompt
-3. Qwen2.5-VL processes the image on your GPU and generates text
+3. Qwen3-VL processes the image on your GPU and generates text
 4. brane streams the result to stdout or writes it to a file
 5. The model unloads from VRAM (unless `--persist` is set)
 
@@ -185,20 +185,20 @@ sudo systemctl start ollama
 Pull the model:
 
 ```bash
-ollama pull qwen2.5vl:7b
-ollama pull qwen2.5vl:72b  # optional
+ollama pull qwen3-vl:8b
+ollama pull qwen3-vl:30b  # optional
 ```
 
 ### Slow first run
 
-The first invocation after a reboot loads the model into VRAM (~5-8 seconds for 7B). Subsequent runs are faster if you use `--persist`. Without `--persist`, every run pays this cost -- but your VRAM stays free between runs.
+The first invocation after a reboot loads the model into VRAM (~5-8 seconds for 8B). Subsequent runs are faster if you use `--persist`. Without `--persist`, every run pays this cost -- but your VRAM stays free between runs.
 
 ### Out of VRAM
 
-The 7B model needs ~5GB of VRAM. The 72B model needs ~48GB. If you're running out:
+The 8B model needs ~8GB of VRAM. The 30B model needs ~22GB. If you're running out:
 
 - Close other GPU-heavy applications
-- Use the 7B model instead of 72B
+- Use the 8B model instead of 30B
 - Check what's in VRAM: `nvidia-smi`
 
 ### Truncated output on large documents

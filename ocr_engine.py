@@ -1,4 +1,4 @@
-"""brane - Local VLM-based OCR using Qwen2.5-VL via Ollama."""
+"""brane - Local VLM-based OCR using Qwen3-VL via Ollama."""
 
 import sys
 from pathlib import Path
@@ -10,10 +10,10 @@ from prompts import MARKDOWN_PROMPT, PLAIN_PROMPT
 
 SUPPORTED_FORMATS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif", ".gif"}
 MODELS = {
-    "7b": "qwen2.5vl:7b",
-    "72b": "qwen2.5vl:72b",
+    "8b": "qwen3-vl:8b",
+    "30b": "qwen3-vl:30b",
 }
-DEFAULT_MODEL = "7b"
+DEFAULT_MODEL = "8b"
 
 
 def validate_image(path: Path) -> Path:
@@ -73,7 +73,7 @@ def main(images, output, fmt, model_size, custom_prompt, no_stream, persist):
 
         brane document.png -o result.md
 
-        brane *.png -m 72b -o combined.md
+        brane *.png -m 30b -o combined.md
 
         brane photo.jpg --format plain
 

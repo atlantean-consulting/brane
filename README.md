@@ -2,7 +2,7 @@
 
 Local OCR that doesn't suck.
 
-`brane` uses [Qwen2.5-VL](https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct) running locally via [Ollama](https://ollama.com) to extract text from images with near-cloud-API quality. No data leaves your machine!
+`brane` uses [Qwen3-VL](https://github.com/QwenLM/Qwen3-VL) running locally via [Ollama](https://ollama.com) to extract text from images with near-cloud-API quality. No data leaves your machine!
 
 ## Quick Start
 
@@ -16,8 +16,8 @@ brane screenshot.png
 # Save to file
 brane document.png -o result.md
 
-# Use the 72B model for maximum quality
-brane document.png -m 72b
+# Use the 30B model for maximum quality
+brane document.png -m 30b
 
 # OCR multiple images at once
 brane *.png -o combined.md
@@ -30,9 +30,9 @@ brane table.png --prompt "Extract this table as CSV"
 
 `brane` is designed for high-horsepower systems, but it should work on any Linux device with a good GPU if you're patient enough. Minimum specs are:
 
-- Linux with NVIDIA GPU (8GB+ VRAM for 7B model, 48GB+ for 72B)
+- Linux with NVIDIA GPU (8GB+ VRAM for 8B model, 24GB+ for 30B)
 - Python 3.12+
-- ~5GB disk space for 7B model, ~48GB for 72B
+- ~6GB disk space for 8B model, ~19GB for 30B
 
 ## Options
 
@@ -41,7 +41,7 @@ brane [OPTIONS] IMAGES...
 
   -o, --output PATH         Write output to file
   -f, --format [markdown|plain]  Output format (default: markdown)
-  -m, --model [7b|72b]      Model size (default: 7b)
+  -m, --model [8b|30b]      Model size (default: 8b)
   -p, --prompt TEXT          Custom prompt override
   --persist                  Keep model in VRAM after completion
   --no-stream                Disable streaming output

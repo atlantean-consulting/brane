@@ -38,11 +38,14 @@ brane music old_scan.pdf --clean -o result.musicxml
 
 ## Requirements
 
-`brane` is designed for high-horsepower systems, but it should work on any Linux device with a good GPU if you're patient enough. Minimum specs are:
+`brane` is designed for high-horsepower systems, but it should work on any Linux device with a good NVIDIA GPU if you're patient enough. Minimum specs are:
 
-- Linux with NVIDIA GPU (8GB+ VRAM for 8B model, 24GB+ for 30B)
+- Linux with NVIDIA\* GPU (8GB+ VRAM for 8B model, 24GB+ for 30B)
 - Python 3.12+
 - ~6GB disk space for 8B model, ~19GB for 30B
+
+\* Unfortunately, in a rare L for Team Red, it does have to be an NVIDIA. Radeon graphics cards are not supported and likely never will be.
+
 
 ## Text OCR Options
 
